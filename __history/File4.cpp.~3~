@@ -1,0 +1,95 @@
+#pragma hdrstop
+#pragma argsused
+
+//#include <fileapi.h>
+#include <windows.h>
+#include <iostream>
+#include <cstdlib>
+#include "NTFSDriverPCH1.h"
+
+#ifdef _WIN32
+#include <tchar.h>
+#else
+  typedef char _TCHAR;
+  #define _tmain main
+#endif
+
+#include <stdio.h>
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+	setlocale(LC_CTYPE, "RU");
+    SetConsoleCP(1251);
+	SetConsoleOutputCP(1251);
+
+	BYTE databuffer[512];
+	NTFS_BootRecord *pNTFS_BootRecord = (NTFS_BootRecord*)databuffer;
+
+	HANDLE filehandle = CreateFileW(
+	L"\\\\.\\C:",
+	GENERIC_READ,
+	FILE_SHARE_READ | FILE_SHARE_WRITE,
+	NULL,
+	OPEN_EXISTING,
+	FILE_ATTRIBUTE_NORMAL,
+	NULL);
+
+	if (filehandle == INVALID_HANDLE_VALUE) {
+		std::cout << "Для корректного запуска файла требуются права администратора.\n";
+		system("pause");
+		exit(-1);
+	}
+
+	LARGE_INTEGER sectoroffset;
+	sectoroffset.QuadPart = 0;
+
+	unsigned long currentposition = SetFilePointer(
+	filehandle,
+	sectoroffset.LowPart,
+	&sectoroffset.HighPart,
+	FILE_BEGIN);
+
+	DWORD bytestoread = 512;
+	DWORD bytesread;
+
+	bool readresult = ReadFile(
+	filehandle,
+	databuffer,
+	bytestoread,
+	&bytesread,
+	NULL);
+
+	if(readresult == false || bytesread != bytestoread)
+	{
+		std::cout << "Ошибка чтения последовательности байт:)\n";
+		system("pause");
+		exit(-1);
+	}
+
+	UINT name_lo = pNTFS_BootRecord->name_lo;
+	UINT name_hi = pNTFS_BootRecord->name_hi;
+	USHORT sec_size = pNTFS_BootRecord->sec_size;
+	BYTE secs_cluster = pNTFS_BootRecord->secs_cluster;
+	ULONGLONG num_secs = pNTFS_BootRecord->num_secs;
+	ULONGLONG mft_clus = pNTFS_BootRecord->mft_clus;
+	ULONGLONG mft2_clus = pNTFS_BootRecord->mft2_clus;
+	UINT mft_rec_size = pNTFS_BootRecord->mft_rec_size;
+	UINT volume_id_lo = pNTFS_BootRecord->volume_id_lo;
+	UINT volume_id_hi = pNTFS_BootRecord->volume_id_hi;
+	USHORT sign = pNTFS_BootRecord->sign;
+
+
+	std::cout << "Количество байт в секторе: " << sec_size;
+	std::cout << "\nКоличество секторов в кластере " << static_cast<int>(secs_cluster);
+	std::cout << "\nКоличество секторов в блоке " << num_secs;
+	std::cout << "\nНачальный кластер MFT таблицы: " << mft_clus;
+	std::cout << "\nTНачальный кластер копии MFT таблицы:" << mft2_clus;
+	std::cout << "\nРазмер записи MFT в кластерах: " << mft_rec_size;
+	std::cout << "\nНаименьшее слово в загрузочном диске: " << volume_id_lo;
+	std::cout << "\nНаибольшее слово в загрузочном диске: " << volume_id_hi;
+
+	std::cout << "\n";
+	system("pause");
+	CloseHandle(filehandle);
+	return 0;
+}
